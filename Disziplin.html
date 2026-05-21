@@ -1,0 +1,521 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2865
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 <html lang="de">\
+<head>\
+  <meta charset="UTF-8" />\
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />\
+  <meta name="apple-mobile-web-app-capable" content="yes" />\
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\
+  <meta name="apple-mobile-web-app-title" content="Disziplin" />\
+  <meta name="theme-color" content="#020817" />\
+  <title>Disziplin</title>\
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />\
+  <style>\
+    *, *::before, *::after \{ box-sizing: border-box; margin: 0; padding: 0; \}\
+    html, body \{ height: 100%; background: #020817; color: #e2e8f0; font-family: 'DM Sans', sans-serif; -webkit-tap-highlight-color: transparent; \}\
+    input[type=range] \{ -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: #1e293b; outline: none; cursor: pointer; \}\
+    input[type=range]::-webkit-slider-thumb \{ -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb-color, #a3e635); cursor: pointer; \}\
+    input[type=number] \{ -webkit-appearance: none; appearance: none; \}\
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button \{ -webkit-appearance: none; \}\
+    button \{ -webkit-appearance: none; appearance: none; \}\
+    ::-webkit-scrollbar \{ display: none; \}\
+    * \{ scrollbar-width: none; \}\
+  </style>\
+</head>\
+<body>\
+<div id="app"></div>\
+\
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>\
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>\
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>\
+\
+<script type="text/babel">\
+const \{ useState, useEffect \} = React;\
+\
+const DAY_TYPES = ["Krafttag", "Cardiotag", "Ruhetag"];\
+\
+const defaultEntry = \{\
+  dayType: "Krafttag",\
+  kcal: "", protein: "", sleepScore: "",\
+  watchStand: false, watchMove: false, watchCalories: false, steps10k: false,\
+  trainingDone: false, stretchingLevel: 0, intensity: 0, completeness: 0,\
+  cardioMinutes: 0,\
+  creatin: false, omega3: false, magnesium: false, calcium: false, others: false,\
+  water: "",\
+\};\
+\
+function calcKcalPoints(kcal) \{\
+  const v = parseFloat(kcal);\
+  if (isNaN(v)) return 0;\
+  if (v >= 3150 && v <= 3350) return 15;\
+  if ((v >= 3050 && v < 3150) || (v > 3350 && v <= 3450)) return 12;\
+  if ((v >= 2950 && v < 3050) || (v > 3450 && v <= 3550)) return 8;\
+  if ((v >= 2800 && v < 2950) || (v > 3550 && v <= 3700)) return 4;\
+  return 0;\
+\}\
+\
+function calcProteinPoints(protein) \{\
+  const v = parseFloat(protein);\
+  if (isNaN(v)) return 0;\
+  if (v >= 185) return 15;\
+  if (v >= 170) return 12;\
+  if (v >= 155) return 9;\
+  if (v >= 140) return 6;\
+  if (v >= 120) return 3;\
+  return 0;\
+\}\
+\
+function calcSleepPoints(score) \{\
+  const v = parseFloat(score);\
+  if (isNaN(v)) return 0;\
+  if (v >= 90) return 25;\
+  if (v >= 80) return 21;\
+  if (v >= 70) return 16;\
+  if (v >= 60) return 10;\
+  if (v >= 50) return 5;\
+  return 0;\
+\}\
+\
+function calcSportPoints(entry) \{\
+  let base = 0;\
+  if (entry.watchStand) base += 1;\
+  if (entry.watchMove) base += 1;\
+  if (entry.watchCalories) base += 1;\
+  if (entry.steps10k) base += 2;\
+  let extra = 0;\
+  if (entry.dayType === "Ruhetag") \{\
+    extra = 20;\
+  \} else if (entry.dayType === "Krafttag") \{\
+    if (entry.trainingDone) \{\
+      extra += 5;\
+      extra += entry.stretchingLevel;\
+      extra += entry.intensity;\
+      extra += entry.completeness;\
+    \}\
+  \} else if (entry.dayType === "Cardiotag") \{\
+    if (entry.cardioMinutes === 40) extra += 12;\
+    if (entry.cardioMinutes === 50) extra += 14;\
+    if (entry.cardioMinutes > 0) extra += entry.stretchingLevel;\
+  \}\
+  return Math.min(25, base + extra);\
+\}\
+\
+function calcSupplementPoints(entry) \{\
+  return (entry.creatin ? 1.5 : 0) + (entry.omega3 ? 1.5 : 0) +\
+    (entry.others ? 1.0 : 0) + (entry.magnesium ? 0.5 : 0) + (entry.calcium ? 0.5 : 0);\
+\}\
+\
+function calcWaterPoints(water) \{\
+  const v = parseFloat(water);\
+  if (isNaN(v)) return 0;\
+  if (v >= 3.5) return 5; if (v >= 3.0) return 4;\
+  if (v >= 2.5) return 3; if (v >= 2.0) return 2;\
+  if (v >= 1.5) return 1; return 0;\
+\}\
+\
+function calcStreakBonus(history) \{\
+  if (history.length < 3) return 0;\
+  let streak = 0;\
+  for (let i = 0; i < history.length; i++) \{\
+    if (history[i].score >= 70) streak++; else break;\
+  \}\
+  if (streak >= 7) return 10; if (streak >= 5) return 6; if (streak >= 3) return 3;\
+  return 0;\
+\}\
+\
+function calcTotal(entry, streakBonus = 0) \{\
+  return Math.round(\
+    calcKcalPoints(entry.kcal) + calcProteinPoints(entry.protein) +\
+    calcSleepPoints(entry.sleepScore) + calcSportPoints(entry) +\
+    calcSupplementPoints(entry) + calcWaterPoints(entry.water) + streakBonus\
+  );\
+\}\
+\
+function getScoreLabel(score) \{\
+  if (score >= 90) return \{ label: "Elitetag", emoji: "\uc0\u55357 \u56613 " \};\
+  if (score >= 80) return \{ label: "Starker Tag", emoji: "\uc0\u9889 " \};\
+  if (score >= 70) return \{ label: "Solider Tag", emoji: "\uc0\u9989 " \};\
+  if (score >= 60) return \{ label: "Mittelm\'e4\'dfig", emoji: "\uc0\u12336 \u65039 " \};\
+  if (score >= 50) return \{ label: "Schwacher Tag", emoji: "\uc0\u9888 \u65039 " \};\
+  return \{ label: "Verlorener Tag", emoji: "\uc0\u10060 " \};\
+\}\
+\
+function ScoreRing(\{ score, size = 120 \}) \{\
+  const r = 46, circ = 2 * Math.PI * r;\
+  const dash = (Math.min(score, 100) / 100) * circ;\
+  const color = score >= 80 ? "#a3e635" : score >= 60 ? "#facc15" : score >= 40 ? "#fb923c" : "#f87171";\
+  const \{ label, emoji \} = getScoreLabel(score);\
+  return (\
+    <div style=\{\{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 \}\}>\
+      <svg width=\{size\} height=\{size\} viewBox="0 0 100 100">\
+        <circle cx="50" cy="50" r=\{r\} fill="none" stroke="#1e293b" strokeWidth="8" />\
+        <circle cx="50" cy="50" r=\{r\} fill="none" stroke=\{color\} strokeWidth="8"\
+          strokeDasharray=\{`$\{dash\} $\{circ\}`\} strokeLinecap="round" transform="rotate(-90 50 50)"\
+          style=\{\{ transition: "stroke-dasharray 0.6s cubic-bezier(.4,2,.6,1), stroke 0.4s" \}\} />\
+        <text x="50" y="46" textAnchor="middle" fill=\{color\} fontSize="22" fontWeight="700" fontFamily="'DM Mono', monospace">\{score\}</text>\
+        <text x="50" y="60" textAnchor="middle" fill="#64748b" fontSize="9" fontFamily="'DM Sans', sans-serif">/ 100</text>\
+      </svg>\
+      <div style=\{\{ fontSize: 12, color, fontFamily: "'DM Sans', sans-serif", fontWeight: 600 \}\}>\{emoji\} \{label\}</div>\
+    </div>\
+  );\
+\}\
+\
+function MiniBar(\{ label, points, max, color = "#a3e635" \}) \{\
+  const pct = max > 0 ? (Math.min(points, max) / max) * 100 : 0;\
+  const display = Number.isInteger(points) ? points : points.toFixed(1);\
+  return (\
+    <div style=\{\{ marginBottom: 10 \}\}>\
+      <div style=\{\{ display: "flex", justifyContent: "space-between", marginBottom: 4 \}\}>\
+        <span style=\{\{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" \}\}>\{label\}</span>\
+        <span style=\{\{ fontSize: 12, color: "#e2e8f0", fontFamily: "'DM Mono', monospace" \}\}>\{display\}<span style=\{\{ color: "#475569" \}\}>/\{max\}</span></span>\
+      </div>\
+      <div style=\{\{ height: 5, background: "#1e293b", borderRadius: 3, overflow: "hidden" \}\}>\
+        <div style=\{\{ height: "100%", width: `$\{pct\}%`, background: color, borderRadius: 3, transition: "width 0.5s cubic-bezier(.4,2,.6,1)" \}\} />\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function Toggle(\{ checked, onChange, label \}) \{\
+  return (\
+    <label style=\{\{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 8 \}\}>\
+      <div onClick=\{() => onChange(!checked)\} style=\{\{\
+        width: 36, height: 20, borderRadius: 10,\
+        background: checked ? "#a3e635" : "#1e293b",\
+        border: `1.5px solid $\{checked ? "#a3e635" : "#334155"\}`,\
+        position: "relative", transition: "background 0.2s", flexShrink: 0, cursor: "pointer"\
+      \}\}>\
+        <div style=\{\{\
+          position: "absolute", top: 2, left: checked ? 16 : 2,\
+          width: 14, height: 14, borderRadius: "50%",\
+          background: checked ? "#0f172a" : "#475569", transition: "left 0.2s"\
+        \}\} />\
+      </div>\
+      <span style=\{\{ fontSize: 13, color: "#cbd5e1" \}\}>\{label\}</span>\
+    </label>\
+  );\
+\}\
+\
+function SliderInput(\{ label, value, onChange, min = 0, max = 5, step = 1, color = "#a3e635" \}) \{\
+  return (\
+    <div style=\{\{ marginBottom: 12 \}\}>\
+      <div style=\{\{ display: "flex", justifyContent: "space-between", marginBottom: 6 \}\}>\
+        <span style=\{\{ fontSize: 13, color: "#cbd5e1" \}\}>\{label\}</span>\
+        <span style=\{\{ fontSize: 13, color, fontFamily: "'DM Mono', monospace" \}\}>\{value\}/\{max\}</span>\
+      </div>\
+      <input type="range" min=\{min\} max=\{max\} step=\{step\} value=\{value\}\
+        onChange=\{e => onChange(Number(e.target.value))\}\
+        style=\{\{ "--thumb-color": color, accentColor: color \}\} />\
+    </div>\
+  );\
+\}\
+\
+function SegmentedControl(\{ options, value, onChange, color = "#a3e635", activeBg = "#1a2e05" \}) \{\
+  return (\
+    <div style=\{\{ display: "flex", gap: 8 \}\}>\
+      \{options.map(o => (\
+        <button key=\{o.v\} onClick=\{() => onChange(o.v)\} style=\{\{\
+          flex: 1, padding: "7px 4px", borderRadius: 8, fontSize: 12,\
+          fontFamily: "'DM Sans', sans-serif", cursor: "pointer",\
+          border: `1.5px solid $\{value === o.v ? color : "#1e293b"\}`,\
+          background: value === o.v ? activeBg : "#0f172a",\
+          color: value === o.v ? color : "#475569", transition: "all 0.15s"\
+        \}\}>\{o.l\}</button>\
+      ))\}\
+    </div>\
+  );\
+\}\
+\
+function NumberInput(\{ label, value, onChange, unit, placeholder \}) \{\
+  return (\
+    <div style=\{\{ marginBottom: 12 \}\}>\
+      <label style=\{\{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 6 \}\}>\{label\}</label>\
+      <div style=\{\{ display: "flex", alignItems: "center", gap: 8 \}\}>\
+        <input type="number" value=\{value\} onChange=\{e => onChange(e.target.value)\} placeholder=\{placeholder\}\
+          style=\{\{\
+            background: "#0f172a", border: "1.5px solid #1e293b", borderRadius: 8,\
+            color: "#e2e8f0", padding: "8px 12px", fontSize: 15, width: "100%",\
+            fontFamily: "'DM Mono', monospace", outline: "none", transition: "border-color 0.2s"\
+          \}\}\
+          onFocus=\{e => e.target.style.borderColor = "#a3e635"\}\
+          onBlur=\{e => e.target.style.borderColor = "#1e293b"\} />\
+        \{unit && <span style=\{\{ color: "#475569", fontSize: 13, whiteSpace: "nowrap" \}\}>\{unit\}</span>\}\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function Section(\{ title, children, accent = "#a3e635" \}) \{\
+  return (\
+    <div style=\{\{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: "16px 18px", marginBottom: 12 \}\}>\
+      <div style=\{\{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: accent, marginBottom: 14, fontWeight: 600 \}\}>\{title\}</div>\
+      \{children\}\
+    </div>\
+  );\
+\}\
+\
+function App() \{\
+  const [entry, setEntry] = useState(\{ ...defaultEntry \});\
+  const [history, setHistory] = useState([]);\
+  const [view, setView] = useState("today");\
+  const [saved, setSaved] = useState(false);\
+\
+  useEffect(() => \{\
+    try \{\
+      const stored = localStorage.getItem("discipline_history");\
+      if (stored) setHistory(JSON.parse(stored));\
+    \} catch \{\}\
+  \}, []);\
+\
+  function saveEntry() \{\
+    const today = new Date().toISOString().split("T")[0];\
+    const streakBonus = calcStreakBonus(history);\
+    const record = \{ date: today, entry: \{ ...entry \}, score: calcTotal(entry, streakBonus) \};\
+    const newHistory = [record, ...history.filter(h => h.date !== today)].slice(0, 90);\
+    setHistory(newHistory);\
+    try \{ localStorage.setItem("discipline_history", JSON.stringify(newHistory)); \} catch \{\}\
+    setSaved(true);\
+    setTimeout(() => setSaved(false), 2000);\
+  \}\
+\
+  const set = (key, val) => setEntry(e => (\{ ...e, [key]: val \}));\
+\
+  const streakBonus = calcStreakBonus(history);\
+  const total = calcTotal(entry, streakBonus);\
+  const kcalPts = calcKcalPoints(entry.kcal);\
+  const protPts = calcProteinPoints(entry.protein);\
+  const sleepPts = calcSleepPoints(entry.sleepScore);\
+  const sportPts = calcSportPoints(entry);\
+  const suppPts = calcSupplementPoints(entry);\
+  const waterPts = calcWaterPoints(entry.water);\
+  const scoreColor = total >= 80 ? "#a3e635" : total >= 60 ? "#facc15" : total >= 40 ? "#fb923c" : "#f87171";\
+\
+  const avgScore = history.length > 0\
+    ? Math.round(history.slice(0, 7).reduce((a, b) => a + b.score, 0) / Math.min(7, history.length))\
+    : null;\
+\
+  let currentStreak = 0;\
+  for (let i = 0; i < history.length; i++) \{\
+    if (history[i].score >= 70) currentStreak++; else break;\
+  \}\
+\
+  return (\
+    <div style=\{\{ minHeight: "100vh", background: "#020817", color: "#e2e8f0", fontFamily: "'DM Sans', sans-serif", paddingBottom: 40 \}\}>\
+\
+      \{/* Header */\}\
+      <div style=\{\{\
+        background: "linear-gradient(180deg, #0f172a 0%, #020817 100%)",\
+        borderBottom: "1px solid #1e293b", padding: "20px 20px 16px",\
+        position: "sticky", top: 0, zIndex: 10\
+      \}\}>\
+        <div style=\{\{ display: "flex", justifyContent: "space-between", alignItems: "center" \}\}>\
+          <div>\
+            <div style=\{\{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#475569", marginBottom: 2 \}\}>Tagesscore</div>\
+            <div style=\{\{ fontSize: 22, fontWeight: 600, color: "#f1f5f9", fontFamily: "'DM Mono', monospace" \}\}>\
+              Dis<span style=\{\{ color: scoreColor \}\}>ziplin</span>\
+            </div>\
+          </div>\
+          <div style=\{\{ display: "flex", gap: 8 \}\}>\
+            \{["today", "history"].map(v => (\
+              <button key=\{v\} onClick=\{() => setView(v)\} style=\{\{\
+                background: view === v ? "#1e293b" : "transparent",\
+                border: `1px solid $\{view === v ? "#334155" : "#1e293b"\}`,\
+                borderRadius: 8, padding: "6px 14px", color: view === v ? "#e2e8f0" : "#475569",\
+                fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",\
+                textTransform: "uppercase", letterSpacing: "0.08em"\
+              \}\}>\
+                \{v === "today" ? "Heute" : "Verlauf"\}\
+              </button>\
+            ))\}\
+          </div>\
+        </div>\
+      </div>\
+\
+      <div style=\{\{ maxWidth: 480, margin: "0 auto", padding: "0 16px" \}\}>\
+\
+        \{view === "today" && (\
+          <>\
+            <div style=\{\{ display: "flex", alignItems: "center", gap: 20, padding: "20px 0 12px" \}\}>\
+              <ScoreRing score=\{total\} size=\{110\} />\
+              <div style=\{\{ flex: 1 \}\}>\
+                <MiniBar label="Kalorien" points=\{kcalPts\} max=\{15\} />\
+                <MiniBar label="Protein" points=\{protPts\} max=\{15\} color="#38bdf8" />\
+                <MiniBar label="Schlaf" points=\{sleepPts\} max=\{25\} color="#818cf8" />\
+                <MiniBar label="Sport" points=\{sportPts\} max=\{25\} color="#fb923c" />\
+                <MiniBar label="Supplemente" points=\{suppPts\} max=\{5\} color="#f472b6" />\
+                <MiniBar label="Hydration" points=\{waterPts\} max=\{5\} color="#34d399" />\
+                \{streakBonus > 0 && <MiniBar label="Streak" points=\{streakBonus\} max=\{10\} color="#fbbf24" />\}\
+              </div>\
+            </div>\
+\
+            \{currentStreak > 0 && (\
+              <div style=\{\{\
+                background: "#0f172a", border: "1px solid #1e293b", borderRadius: 10,\
+                padding: "10px 14px", marginBottom: 12,\
+                display: "flex", justifyContent: "space-between", alignItems: "center"\
+              \}\}>\
+                <span style=\{\{ fontSize: 12, color: "#94a3b8" \}\}>Aktueller Streak</span>\
+                <span style=\{\{ fontSize: 14, color: "#fbbf24", fontFamily: "'DM Mono', monospace", fontWeight: 600 \}\}>\
+                  \uc0\u55357 \u56613  \{currentStreak\} \{currentStreak === 1 ? "Tag" : "Tage"\}\{streakBonus > 0 ? ` \'b7 +$\{streakBonus\} Pkt.` : ""\}\
+                </span>\
+              </div>\
+            )\}\
+\
+            <Section title="Tagestyp">\
+              <SegmentedControl options=\{DAY_TYPES.map(dt => (\{ v: dt, l: dt \}))\} value=\{entry.dayType\} onChange=\{v => set("dayType", v)\} />\
+            </Section>\
+\
+            <Section title="Ern\'e4hrung" accent="#a3e635">\
+              <NumberInput label="Kalorien" value=\{entry.kcal\} onChange=\{v => set("kcal", v)\} unit="kcal" placeholder="3250" />\
+              <NumberInput label="Protein" value=\{entry.protein\} onChange=\{v => set("protein", v)\} unit="g" placeholder="185" />\
+            </Section>\
+\
+            <Section title="Schlaf" accent="#818cf8">\
+              <NumberInput label="Apple Watch Schlaf-Score" value=\{entry.sleepScore\} onChange=\{v => set("sleepScore", v)\} unit="/ 100" placeholder="82" />\
+              \{entry.sleepScore && <div style=\{\{ fontSize: 12, color: "#818cf8", fontFamily: "'DM Mono', monospace", marginTop: -4 \}\}>\uc0\u8594  \{sleepPts\} Punkte</div>\}\
+            </Section>\
+\
+            <Section title="Sport & Aktivit\'e4t" accent="#fb923c">\
+              <div style=\{\{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 \}\}>Apple Watch \'97 Basis</div>\
+              <Toggle checked=\{entry.watchStand\} onChange=\{v => set("watchStand", v)\} label="Stehziel erreicht" />\
+              <Toggle checked=\{entry.watchMove\} onChange=\{v => set("watchMove", v)\} label="Bewegungsziel erreicht" />\
+              <Toggle checked=\{entry.watchCalories\} onChange=\{v => set("watchCalories", v)\} label="Kalorienziel erreicht" />\
+              <Toggle checked=\{entry.steps10k\} onChange=\{v => set("steps10k", v)\} label="10.000 Schritte" />\
+\
+              \{entry.dayType === "Ruhetag" && (\
+                <div style=\{\{ marginTop: 12, padding: "10px 14px", background: "#1a2e05", borderRadius: 8, border: "1px solid #365314" \}\}>\
+                  <span style=\{\{ fontSize: 13, color: "#a3e635" \}\}>\uc0\u10003  Ruhetag eingehalten \'97 +20 Punkte</span>\
+                </div>\
+              )\}\
+\
+              \{entry.dayType === "Krafttag" && (\
+                <>\
+                  <div style=\{\{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 10px" \}\}>Training</div>\
+                  <Toggle checked=\{entry.trainingDone\} onChange=\{v => set("trainingDone", v)\} label="Training durchgef\'fchrt (+5)" />\
+                  \{entry.trainingDone && (\
+                    <>\
+                      <div style=\{\{ marginTop: 12, marginBottom: 12 \}\}>\
+                        <div style=\{\{ fontSize: 13, color: "#cbd5e1", marginBottom: 8 \}\}>Stretching</div>\
+                        <SegmentedControl\
+                          options=\{[\{ v: 0, l: "Keins" \}, \{ v: 3, l: "Minimal (+3)" \}, \{ v: 6, l: "Voll (+6)" \}]\}\
+                          value=\{entry.stretchingLevel\} onChange=\{v => set("stretchingLevel", v)\}\
+                          color="#fb923c" activeBg="#1c1108" />\
+                      </div>\
+                      <SliderInput label="Intensit\'e4t" value=\{entry.intensity\} onChange=\{v => set("intensity", v)\} max=\{5\} color="#fb923c" />\
+                      <SliderInput label="Vollst\'e4ndigkeit" value=\{entry.completeness\} onChange=\{v => set("completeness", v)\} max=\{4\} color="#fb923c" />\
+                    </>\
+                  )\}\
+                </>\
+              )\}\
+\
+              \{entry.dayType === "Cardiotag" && (\
+                <>\
+                  <div style=\{\{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", margin: "14px 0 10px" \}\}>Cardio</div>\
+                  <SegmentedControl\
+                    options=\{[\{ v: 0, l: "Kein" \}, \{ v: 40, l: "40 min (+12)" \}, \{ v: 50, l: "50 min (+14)" \}]\}\
+                    value=\{entry.cardioMinutes\} onChange=\{v => set("cardioMinutes", v)\}\
+                    color="#fb923c" activeBg="#1c1108" />\
+                  \{entry.cardioMinutes > 0 && (\
+                    <div style=\{\{ marginTop: 12 \}\}>\
+                      <div style=\{\{ fontSize: 13, color: "#cbd5e1", marginBottom: 8 \}\}>Stretching</div>\
+                      <SegmentedControl\
+                        options=\{[\{ v: 0, l: "Keins" \}, \{ v: 3, l: "Minimal (+3)" \}, \{ v: 6, l: "Voll (+6)" \}]\}\
+                        value=\{entry.stretchingLevel\} onChange=\{v => set("stretchingLevel", v)\}\
+                        color="#fb923c" activeBg="#1c1108" />\
+                    </div>\
+                  )\}\
+                </>\
+              )\}\
+            </Section>\
+\
+            <Section title="Supplemente" accent="#f472b6">\
+              <Toggle checked=\{entry.creatin\} onChange=\{v => set("creatin", v)\} label="Creatin (+1.5)" />\
+              <Toggle checked=\{entry.omega3\} onChange=\{v => set("omega3", v)\} label="Omega-3 (+1.5)" />\
+              <Toggle checked=\{entry.others\} onChange=\{v => set("others", v)\} label="B12 + Folat + Ashwagandha (+1.0)" />\
+              <Toggle checked=\{entry.magnesium\} onChange=\{v => set("magnesium", v)\} label="Magnesium (+0.5)" />\
+              <Toggle checked=\{entry.calcium\} onChange=\{v => set("calcium", v)\} label="Calcium + D3 + K (+0.5)" />\
+            </Section>\
+\
+            <Section title="Hydration" accent="#34d399">\
+              <NumberInput label="Wasseraufnahme" value=\{entry.water\} onChange=\{v => set("water", v)\} unit="Liter" placeholder="3.5" />\
+              \{entry.water && <div style=\{\{ fontSize: 12, color: "#34d399", fontFamily: "'DM Mono', monospace", marginTop: -4 \}\}>\uc0\u8594  \{waterPts\} Punkte</div>\}\
+            </Section>\
+\
+            <button onClick=\{saveEntry\} style=\{\{\
+              width: "100%", padding: "14px", borderRadius: 12,\
+              background: saved ? "#1a2e05" : "linear-gradient(135deg, #a3e635, #65a30d)",\
+              border: "none", color: saved ? "#a3e635" : "#0f172a",\
+              fontSize: 15, fontWeight: 600, cursor: "pointer",\
+              fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.05em",\
+              transition: "all 0.3s", marginTop: 8\
+            \}\}>\
+              \{saved ? "\uc0\u10003  Gespeichert" : "Tag speichern"\}\
+            </button>\
+          </>\
+        )\}\
+\
+        \{view === "history" && (\
+          <div style=\{\{ padding: "20px 0 12px" \}\}>\
+            \{avgScore !== null && (\
+              <div style=\{\{\
+                background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12,\
+                padding: "16px 18px", marginBottom: 16,\
+                display: "flex", justifyContent: "space-between", alignItems: "center"\
+              \}\}>\
+                <div>\
+                  <div style=\{\{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.1em" \}\}>\'d8 letzte 7 Tage</div>\
+                  <div style=\{\{ fontSize: 28, fontFamily: "'DM Mono', monospace", color: avgScore >= 80 ? "#a3e635" : avgScore >= 60 ? "#facc15" : "#fb923c", fontWeight: 600 \}\}>\{avgScore\}</div>\
+                </div>\
+                <div style=\{\{ textAlign: "right" \}\}>\
+                  <div style=\{\{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 \}\}>Streak</div>\
+                  <div style=\{\{ fontSize: 18, color: "#fbbf24" \}\}>\uc0\u55357 \u56613  \{currentStreak\} Tage</div>\
+                </div>\
+              </div>\
+            )\}\
+            \{history.length === 0 && (\
+              <div style=\{\{ textAlign: "center", color: "#475569", padding: "40px 0", fontSize: 14 \}\}>Noch keine Eintr\'e4ge gespeichert.</div>\
+            )\}\
+            \{history.map((record, i) => \{\
+              const sc = record.score;\
+              const col = sc >= 80 ? "#a3e635" : sc >= 60 ? "#facc15" : sc >= 40 ? "#fb923c" : "#f87171";\
+              const date = new Date(record.date);\
+              const label = date.toLocaleDateString("de-DE", \{ weekday: "short", day: "numeric", month: "short" \});\
+              const \{ emoji \} = getScoreLabel(sc);\
+              return (\
+                <div key=\{i\} style=\{\{\
+                  background: "#0f172a", border: "1px solid #1e293b", borderRadius: 10,\
+                  padding: "12px 16px", marginBottom: 8,\
+                  display: "flex", alignItems: "center", justifyContent: "space-between"\
+                \}\}>\
+                  <div>\
+                    <div style=\{\{ fontSize: 13, color: "#94a3b8" \}\}>\{label\}</div>\
+                    <div style=\{\{ fontSize: 11, color: "#334155", marginTop: 2 \}\}>\{record.entry.dayType\}</div>\
+                  </div>\
+                  <div style=\{\{ display: "flex", alignItems: "center", gap: 12 \}\}>\
+                    <div style=\{\{ width: 80, height: 4, background: "#1e293b", borderRadius: 2, overflow: "hidden" \}\}>\
+                      <div style=\{\{ width: `$\{Math.min(sc, 100)\}%`, height: "100%", background: col, borderRadius: 2 \}\} />\
+                    </div>\
+                    <div style=\{\{ fontSize: 16, fontFamily: "'DM Mono', monospace", color: col, fontWeight: 600, minWidth: 50, textAlign: "right" \}\}>\
+                      \{emoji\} \{sc\}\
+                    </div>\
+                  </div>\
+                </div>\
+              );\
+            \})\}\
+          </div>\
+        )\}\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+const root = ReactDOM.createRoot(document.getElementById('app'));\
+root.render(<App />);\
+</script>\
+</body>\
+</html>}
